@@ -1,0 +1,234 @@
+# Package importation
+from __future__ import print_function
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import classification_report
+from sklearn import datasets
+from skimage import exposure
+import numpy as np
+import  imutils
+import cv2
+import sklearn
+from skimage import data, io
+from matplotlib import pyplot as plt
+import skimage
+from skimage import img_as_ubyte  # convert float to uint8
+from skimage.color import rgb2gray
+import pandas as pd
+#test = cv2.imread("78.JPG")
+#io.imshow(test)
+#plt.show()
+
+test = cv2.imread("123.jpg")
+io.imshow(test)
+plt.show()
+
+# convert original to gray image
+im_gray = rgb2gray(test)
+
+#convert grey image to uint8
+img_gray_u8 = img_as_ubyte(im_gray)
+
+# Convert grayscale image to binary
+#converti les pixel plus grand que 128 en 255
+(thresh, im_bw) = cv2.threshold(img_gray_u8, 128, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+
+# invert image
+im_gray_invert = 255 - im_bw
+
+#découpe de la partie supérieure
+
+stop = False
+for y in range(im_gray_invert.shape[0]):                #parcours de chaques lignes
+    for x in range(im_gray_invert.shape[1]):            #parcours de chaques colonnes
+        if im_gray_invert[y, x] > 250 and stop==False:     #si on a un pixel qui est noir(ou presque) on arrête
+            top = y                                          #on récupère la partie supérieur
+            stop = True                                      #variable stop à true de manière à arrêter la boucle
+            break                                       #sortie de la boucle interne
+    if stop:
+        break                                           #sortie de la boucle externe
+
+im_gray_invert = im_gray_invert[top:im_gray_invert.shape[0], 0:im_gray_invert.shape[1]]   #découpage
+
+# découpe de la partie inférieure
+stop = False
+for y in range(im_gray_invert.shape[0]-1, 0, -1):
+    for x in range(0, im_gray_invert.shape[1]):
+        #print(y, " ", x, " :", im_gray_invert[y, x])
+        if im_gray_invert[y, x] > 250 and stop == False:
+            down = y
+            stop = True
+            break
+    if stop:
+        break
+
+im_gray_invert = im_gray_invert[0:down, 0:im_gray_invert.shape[1]]
+
+#découpe de la partie de gauche
+stop = False
+for x in range(0, im_gray_invert.shape[1]):
+    for y in range(0, im_gray_invert.shape[0]):
+        #print(y, " ", x, " :", im_gray_invert[y, x])
+        if im_gray_invert[y, x] > 250 and stop == False:
+            left = x
+            stop = True
+            break
+    if stop:
+        break
+
+im_gray_invert = im_gray_invert[0:im_gray_invert.shape[0], left-2:im_gray_invert.shape[1]]
+
+# découpe de la partie de droite
+stop = False
+for x in range(im_gray_invert.shape[1]-1, 0, -1):
+    for y in range(0, im_gray_invert.shape[0]):
+        #print(y, " ", x, " :", im_gray_invert[y, x])
+        if im_gray_invert[y, x] > 250 and stop == False:
+            right = x
+            stop = True
+            break
+    if stop:
+        break
+
+im_gray_invert = im_gray_invert[0:im_gray_invert.shape[0], 0:right+2]
+
+#Séparation des chiffres
+im_to_split = im_gray_invert
+io.imshow(im_to_split)
+plt.show()
+
+left = 0
+listeImg = []
+getANumber = False
+nextNumber = True
+for x in range(0, im_to_split.shape[1]):
+    sommeTotalPixels = 0
+    for y in range(0, im_to_split.shape[0]):
+        sommeTotalPixels = sommeTotalPixels + im_to_split[y, x]
+    if (sommeTotalPixels > 300and nextNumber):
+        getANumber = True
+        nextNumber = False
+        left = x
+    if (sommeTotalPixels == 0 and getANumber == True):
+        nextNumber = True
+        sommeTotalPixels = 0
+        getANumber = False
+        listeImg.append(im_to_split[0:im_to_split.shape[0], left-2: x + 3])
+
+
+#resize en 28x28
+#for i in range(0, len(listeImg)):
+#    listeImg[i] = cv2.resize(listeImg[i], (28, 28))
+#    io.imshow(listeImg[i])
+#    plt.show()
+
+#resize en 8x8
+for i in range(0, len(listeImg)):
+    listeImg[i] = cv2.resize(listeImg[i], (45, 45))
+    io.imshow(listeImg[i])
+    plt.show()
+
+#applatissement des images
+listeImgApplatie = []
+for i in range(0, len(listeImg)):
+    listeImgApplatie.append(listeImg[i])
+    listeImgApplatie[i] = listeImgApplatie[i].flatten()
+    #print(listeImgApplatie[i])
+
+#récupération d'une image sur l'ordinateur
+#plt.imsave("resultat.png", listeImg[0])
+
+#affichage des pixels en tableau
+#print(listeImg[0])
+
+#im_final = im_gray_invert.reshape(1, 28, 28, 1)
+
+# handle older versions of sklearn
+if int((sklearn.__version__).split(".")[1]) < 18:
+    from sklearn.cross_validation import train_test_split
+
+# otherwise we're using at lease version 0.18
+else:
+    from sklearn.model_selection import train_test_split
+
+    # load the MNIST digits dataset
+    Data = pd.read_csv("Dataset.csv")
+# take the MNIST data and construct the training and testing split, using 75% of the
+# data for training and 25% for testing
+(trainData, testData, trainLabels, testLabels) = train_test_split(np.array(Data.data),
+	Data.items, test_size=0.01, random_state=42)
+
+# now, let's take 10% of the training data and use that for validation
+(trainData, valData, trainLabels, valLabels) = train_test_split(trainData, trainLabels,
+                                                                test_size=0.1, random_state=84)
+
+# show the sizes of each data split
+print("training data points: {}".format(len(trainLabels)))
+print("validation data points: {}".format(len(valLabels)))
+print("testing data points: {}".format(len(testLabels)))
+
+
+# initialize the values of k for our k-Nearest Neighbor classifier along with the
+# list of accuracies for each value of k
+kVals = range(1, 30, 2)  # range([start], stop[, step])
+accuracies = []
+
+# loop over various values of `k` for the k-Nearest Neighbor classifier
+for k in range(1, 30, 2):
+    # train the k-Nearest Neighbor classifier with the current value of `k`
+    model = KNeighborsClassifier(n_neighbors=k)
+    model.fit(trainData, trainLabels)
+
+    # evaluate the model and update the accuracies list
+    score = model.score(valData, valLabels)
+    print("k=%d, accuracy=%.2f%%" % (k, score * 100))
+    accuracies.append(score)
+
+# find the value of k that has the largest accuracy
+i = int(np.argmax(accuracies))
+print("k=%d achieved highest accuracy of %.2f%% on validation data" % (kVals[i], accuracies[i] * 100))
+# loop over various values of `k` for the k-Nearest Neighbor classifier
+for k in range(1, 30, 2):
+    # train the k-Nearest Neighbor classifier with the current value of `k`
+    model = KNeighborsClassifier(n_neighbors=k)
+    model.fit(trainData, trainLabels)
+
+    # evaluate the model and update the accuracies list
+    score = model.score(valData, valLabels)
+    print("k=%d, accuracy=%.2f%%" % (k, score * 100))
+    accuracies.append(score)
+
+# find the value of k that has the largest accuracy
+i = int(np.argmax(accuracies))
+print("k=%d achieved highest accuracy of %.2f%% on validation data" % (kVals[i], accuracies[i] * 100))
+# re-train our classifier using the best k value and predict the labels of the
+# test data
+#model = KNeighborsClassifier(n_neighbors=15)
+#model.fit(trainData, trainLabels)
+#predictions = model.predict(testData)
+
+# show a final classification report demonstrating the accuracy of the classifier
+# for each of the digits
+print("EVALUATION ON TESTING DATA")
+#print(classification_report(testLabels, predictions))
+for k in range(1, 31, 2):
+    model = KNeighborsClassifier(n_neighbors=k)
+    model.fit(trainData, trainLabels)
+    predictions = model.predict(testData)
+    print(classification_report(testLabels, predictions))
+    print("k : ", k)
+    for i in range(len(listeImgApplatie)):
+                #(map(int, np.random.randint(0, high=len(testLabels), size=(5,)))):
+
+        image = listeImgApplatie[i]
+        prediction = model.predict(image.reshape(1, -1))[0]
+
+        # convert the image for a 64-dim array to an 8 x 8 image compatible with OpenCV,
+        # then resize it to 32 x 32 pixels so we can see it better
+        image = image.reshape((8, 8)).astype("uint8")
+        image = exposure.rescale_intensity(image, out_range=(0, 255))
+        image = imutils.resize(image, width=32, inter=cv2.INTER_CUBIC)
+
+        # show the prediction
+        print("I think that digit is: {}".format(prediction))
+        #cv2.imshow("Image", image)
+        #cv2.waitKey(0)
